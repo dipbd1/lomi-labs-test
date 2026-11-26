@@ -41,13 +41,15 @@ Acceptance:
 
 ## FR-5 Extraction
 
-A worker in the API process parses the PDF, sends the text and the type's field catalog to Gemini, and stores the prompt and raw response. The model id defaults to `gemini-3.5-flash` (`GEMINI_MODEL`). Field types are prompt hints. Stored values are strings. A missing `GEMINI_API_KEY` does not stop the process from booting. That extraction ends `failed`.
+A worker in the API process parses the PDF, sends the text and the type's field catalog to the selected model, and stores the prompt and raw response. Gemini is the default. Its model id defaults to `gemini-3.5-flash` (`GEMINI_MODEL`). When `USE_OPENROUTER` is `true`, `1`, `yes`, or `on` and `OPENROUTER_API_KEY` is set, that same prompt is sent to OpenRouter. The OpenRouter model id defaults to `google/gemini-3.5-flash` (`OPENROUTER_MODEL`). An OpenRouter key with the flag off stays on Gemini. The flag on with no OpenRouter key still selects OpenRouter, and that extraction ends `failed`. Field types are prompt hints. Stored values are strings. A missing key for the selected provider does not stop the process from booting. That extraction ends `failed`.
 
 Acceptance:
 
 - After a successful run the version is `extracted` and has one row per catalog field.
 - The extraction run stores the prompt and the raw model response.
-- With no API key, the stack still starts and the version becomes `failed`.
+- With no key for the selected provider, the stack still starts and the version becomes `failed`.
+- `USE_OPENROUTER` unset or false uses Gemini, including when an OpenRouter key is present.
+- `USE_OPENROUTER` true with `OPENROUTER_API_KEY` set uses OpenRouter.
 
 ## FR-6 Evidence and gaps
 

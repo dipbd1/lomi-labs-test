@@ -50,6 +50,9 @@ services:
       REDIS_URL: redis://redis:6379
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      USE_OPENROUTER: ${USE_OPENROUTER:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-3.5-flash}
       PDF_DIR: /data/pdfs
       FIXTURES_DIR: /app/fixtures
       PORT: 3000

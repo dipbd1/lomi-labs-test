@@ -12,6 +12,8 @@ cp .env.example .env
 
 Set `GEMINI_API_KEY` in `.env`. The model defaults to `gemini-3.5-flash`.
 
+To run the same extraction through OpenRouter, set `USE_OPENROUTER=true` and `OPENROUTER_API_KEY`. The OpenRouter model defaults to `google/gemini-3.5-flash` (`OPENROUTER_MODEL`). The flag accepts `true`, `1`, `yes`, and `on`. With the flag off, an OpenRouter key is ignored and Gemini is used. The flag on without that key fails the extraction the same way a missing Gemini key does.
+
 ```sh
 docker compose up --build
 ```
@@ -54,7 +56,7 @@ A correction is a review row beside the extracted value. Nothing is overwritten,
 
 Postgres is the record. Redis is the queue, and the payload is `{ versionId }`. The version row is inserted before the job is added. If the add fails, the row stays `queued` and the boot sweep enqueues it.
 
-On boot, every `queued` or `extracting` version is enqueued. BullMQ will not run a new job while a completed or failed job still holds `extract-{versionId}`, so enqueue deletes that job first. The id uses a hyphen because BullMQ rejects a custom id that contains `:`. The worker upserts on `(versionId, fieldKey)` and returns immediately when the version is already `extracted`. A second overlapping run can spend a Gemini call. It cannot insert a second row. A crash, `docker compose restart`, or `FLUSHALL` ends the same way: `extracted`, or `failed` with retry. Nothing stays in `extracting`.
+On boot, every `queued` or `extracting` version is enqueued. BullMQ will not run a new job while a completed or failed job still holds `extract-{versionId}`, so enqueue deletes that job first. The id uses a hyphen because BullMQ rejects a custom id that contains `:`. The worker upserts on `(versionId, fieldKey)` and returns immediately when the version is already `extracted`. A second overlapping run can spend a model call. It cannot insert a second row. A crash, `docker compose restart`, or `FLUSHALL` ends the same way: `extracted`, or `failed` with retry. Nothing stays in `extracting`.
 
 A model or parse error is thrown so BullMQ can try twice. The last failure sets `failed` and the error string. Empty PDF text and a missing API key are permanent: the version is `failed` and the job is not retried. `POST /documents/:id/retry` puts a failed current version back to `queued`.
 
@@ -67,6 +69,7 @@ Redis is local, `redis://redis:6379` inside Compose. There is no Upstash. Persis
 - Evidence is unchanged when the whitespace-collapsed quote matches. A shift elsewhere on the page does not drop a review. The stored quote is the span from this version's text, not the model's string.
 - Carry-over copies a review only when there is one to copy. An unreviewed match stays pending.
 - Values are strings. Dates, money, percents, and numbers are hints in the prompt.
+- The model is asked for verbatim evidence: a non-null value includes `evidence` copied from the document text, and the response schema allows null `evidence` only when `value` is null. A quote that is not in that version's text is still stored as a gap.
 - The UI polls every 2 seconds while a visible document is `queued` or `extracting`. Two clients and jobs that finish in seconds do not need a stream.
 - Mantine supplies the table, badges, and inputs. Vite is enough because Nest already owns the API.
 
@@ -80,4 +83,4 @@ Split the worker out of the API process, put PDFs in object storage instead of a
 
 ## Tests
 
-`pnpm test` runs pure functions: evidence location, carry-over, boot recovery, and idempotent field writes. There is no Nest test module.
+`pnpm test` runs pure functions: evidence location, carry-over, boot recovery, idempotent field writes, provider selection, and the extraction prompt and response schema. There is no Nest test module.

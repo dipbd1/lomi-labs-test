@@ -21,7 +21,7 @@ docker compose up --build
 
 `turbo.json` runs `build`, `lint`, and `test`. Postgres is on 5432, Redis on 6379, the API on 3000, and the web app on 8080. The browser calls `/api`, which nginx and the Vite dev server proxy to the API. API routes themselves have no `/api` prefix.
 
-Copy `.env.example` to `.env` and set `GEMINI_API_KEY` before expecting extraction to succeed. The stack still boots without it. Those versions end `failed`.
+Copy `.env.example` to `.env` and set `GEMINI_API_KEY` before expecting extraction to succeed. Set `USE_OPENROUTER=true` and `OPENROUTER_API_KEY` to send extraction to OpenRouter instead. The stack still boots without a key for the selected provider. Those versions end `failed`.
 
 ## Invariants
 

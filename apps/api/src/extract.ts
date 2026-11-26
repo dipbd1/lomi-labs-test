@@ -3,7 +3,8 @@ import { fieldsFor } from '@lomi/contracts'
 import type { PrismaClient } from '@prisma/client'
 import { decideCarryOver } from './carry-over'
 import { applyEvidence } from './evidence'
-import { buildPrompt, generateExtraction, parseModelFields, type ModelField } from './gemini'
+import { buildPrompt, parseModelFields, type ModelField } from './gemini'
+import { generateExtraction, resolveInference } from './inference'
 import { readPdf } from './pdf'
 import { planFieldWrites } from './recovery'
 
@@ -34,17 +35,18 @@ export async function runExtraction(prisma: PrismaClient, versionId: string): Pr
   }
   await prisma.documentVersion.update({ where: { id: versionId }, data: { parsedText: text } })
 
-  if (!process.env.GEMINI_API_KEY) {
-    await markFailed(prisma, versionId, 'GEMINI_API_KEY is not set')
+  const target = resolveInference()
+  if (!target.apiKey) {
+    await markFailed(prisma, versionId, target.missingKeyMessage)
     return
   }
 
   const prompt = buildPrompt(version.document.type, text)
   let raw: string
   try {
-    raw = await generateExtraction(prompt)
+    raw = await generateExtraction(version.document.type, prompt)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Gemini request failed'
+    const message = error instanceof Error ? error.message : 'Model request failed'
     await prisma.extractionRun.create({ data: { versionId, prompt, rawResponse: message } })
     throw new Error(message, { cause: error })
   }

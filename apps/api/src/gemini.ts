@@ -1,6 +1,53 @@
-import { GoogleGenAI, Type } from '@google/genai'
+import { GoogleGenAI } from '@google/genai'
 import type { DocumentType } from '@lomi/contracts'
 import { fieldsFor } from '@lomi/contracts'
+
+type ResponseJsonSchema = {
+  type?: 'object' | 'string' | 'null'
+  description?: string
+  properties?: Record<string, ResponseJsonSchema>
+  required?: string[]
+  additionalProperties?: false
+  anyOf?: ResponseJsonSchema[]
+}
+
+const locatedFieldSchema: ResponseJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  description:
+    'Field present in the document. value is a string and evidence is a contiguous substring of the document text. evidence is not null.',
+  required: ['value', 'evidence', 'gapReason'],
+  properties: {
+    value: {
+      type: 'string',
+      description: 'Field value as a string. Non-null only together with evidence.',
+    },
+    evidence: {
+      type: 'string',
+      description:
+        'Contiguous substring of the document text that contains the value. Required and non-null whenever value is a string. Copy it verbatim. Do not paraphrase.',
+    },
+    gapReason: { type: 'null' },
+  },
+}
+
+const gapFieldSchema: ResponseJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  description: 'Field missing from the document. value and evidence are null.',
+  required: ['value', 'evidence', 'gapReason'],
+  properties: {
+    value: { type: 'null' },
+    evidence: {
+      type: 'null',
+      description: 'Null only because value is null.',
+    },
+    gapReason: {
+      type: 'string',
+      description: 'Short reason the field is missing. Do not guess a value.',
+    },
+  },
+}
 
 export function buildPrompt(type: DocumentType, parsedText: string): string {
   const fields = fieldsFor(type)
@@ -9,9 +56,10 @@ export function buildPrompt(type: DocumentType, parsedText: string): string {
   return [
     `Extract the following fields from this ${type} document.`,
     'Field types are hints only. Store every value as a string.',
-    'Copy evidence as a contiguous substring of the document text.',
-    'If a field is not present, set value to null, explain why in gapReason, and do not guess.',
-    'Return every field listed below.',
+    'Return one JSON object with every expected field key listed below, once, and no other keys.',
+    'Every non-null value MUST include evidence copied as a contiguous substring of the document text.',
+    'A missing field is a gap with value: null, evidence: null, and a short gapReason.',
+    'Do not guess. Do not paraphrase the evidence. Do not return a value without that substring.',
     '',
     'Fields:',
     fields,
@@ -21,34 +69,39 @@ export function buildPrompt(type: DocumentType, parsedText: string): string {
   ].join('\n')
 }
 
-export async function generateExtraction(prompt: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
+export function extractionResponseSchema(type: DocumentType): ResponseJsonSchema {
+  const fields = fieldsFor(type)
+  const properties: Record<string, ResponseJsonSchema> = {}
+  for (const field of fields) {
+    properties[field.field] = {
+      description: `${field.field} (${field.type}). Return this key once.`,
+      anyOf: [locatedFieldSchema, gapFieldSchema],
+    }
+  }
+  const keys = fields.map((field) => field.field)
+  return {
+    type: 'object',
+    additionalProperties: false,
+    description:
+      'Every expected field key, once. A non-null value includes evidence copied as a contiguous substring of the document text. A missing field has value null, evidence null, and a short gapReason.',
+    required: keys,
+    properties,
+  }
+}
+
+export async function generateGemini(
+  prompt: string,
+  apiKey: string,
+  model: string,
+  type: DocumentType,
+): Promise<string> {
   const ai = new GoogleGenAI({ apiKey })
   const response = await ai.models.generateContent({
-    model: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+    model,
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          fields: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                field: { type: Type.STRING },
-                value: { type: Type.STRING, nullable: true },
-                evidence: { type: Type.STRING, nullable: true },
-                gapReason: { type: Type.STRING, nullable: true },
-              },
-              required: ['field', 'value', 'evidence', 'gapReason'],
-            },
-          },
-        },
-        required: ['fields'],
-      },
+      responseJsonSchema: extractionResponseSchema(type),
     },
   })
   if (!response.text) throw new Error('Empty model response')
@@ -68,24 +121,38 @@ function asString(value: unknown): string | null {
   return null
 }
 
+function modelFieldFromRecord(field: string, item: unknown): ModelField {
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+    throw new Error('Model returned invalid JSON')
+  }
+  const record = item as { value?: unknown; evidence?: unknown; gapReason?: unknown }
+  return {
+    field,
+    value: asString(record.value),
+    evidence: asString(record.evidence),
+    gapReason: asString(record.gapReason),
+  }
+}
+
 export function parseModelFields(raw: string): ModelField[] {
   const unwrapped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const parsed: unknown = JSON.parse(unwrapped)
-  if (typeof parsed !== 'object' || parsed === null || !('fields' in parsed)) {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error('Model returned invalid JSON')
   }
-  const fields = parsed.fields
-  if (!Array.isArray(fields)) throw new Error('Model returned invalid JSON')
-  return fields.map((item: unknown) => {
-    if (typeof item !== 'object' || item === null || !('field' in item) || typeof item.field !== 'string') {
-      throw new Error('Model returned invalid JSON')
-    }
-    const record = item as { value?: unknown; evidence?: unknown; gapReason?: unknown }
-    return {
-      field: item.field,
-      value: asString(record.value),
-      evidence: asString(record.evidence),
-      gapReason: asString(record.gapReason),
-    }
-  })
+  if ('fields' in parsed && Array.isArray(parsed.fields)) {
+    return parsed.fields.map((item: unknown) => {
+      if (
+        typeof item !== 'object' ||
+        item === null ||
+        Array.isArray(item) ||
+        !('field' in item) ||
+        typeof item.field !== 'string'
+      ) {
+        throw new Error('Model returned invalid JSON')
+      }
+      return modelFieldFromRecord(item.field, item)
+    })
+  }
+  return Object.entries(parsed).map(([field, item]) => modelFieldFromRecord(field, item))
 }
