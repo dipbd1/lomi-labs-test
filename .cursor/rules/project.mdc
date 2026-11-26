@@ -1,0 +1,19 @@
+---
+description: Follow the Lomi Labs document-review spec
+alwaysApply: true
+---
+
+# Document review
+
+- Read AGENTS.md and SRS.md before changing behavior.
+- SRS.md is the functional spec. Update it in the same change when behavior changes.
+- Postgres is written before a BullMQ job is enqueued. Redis is only the queue.
+- Corrections are review rows. Do not overwrite extracted values.
+- Evidence that cannot be located in that version's parsed text is a gap.
+- Empty parsed text fails the version. Do not invent a page of gaps.
+- Approve is rejected on gaps. Correct is allowed.
+- Enqueue deletes any existing `extract-{versionId}` job, then adds it. Waiting on a previous version delays that same job.
+- No code comments. Imports stay at the top of the file.
+- Switch on unions and enums exhaustively, with a `never` default.
+- Do not add auth, quote highlighting, or a live deploy.
+- Keep the Postgres and Redis memory caps in docker-compose.yml.

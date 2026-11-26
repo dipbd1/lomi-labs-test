@@ -1,0 +1,34 @@
+{
+  "name": "@lomi/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "DATABASE_URL=${DATABASE_URL:-postgresql://lomi:lomi@localhost:5432/lomi} prisma generate && tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "lint": "eslint src",
+    "seed": "tsx src/seed.ts",
+    "test": "tsx --test src/*.spec.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^3.6.1",
+    "@lomi/contracts": "workspace:*",
+    "@nestjs/common": "^11.1.12",
+    "@nestjs/core": "^11.1.12",
+    "@nestjs/platform-express": "^11.1.12",
+    "@prisma/client": "^6.19.3",
+    "bullmq": "^5.66.0",
+    "ioredis": "^5.8.2",
+    "prisma": "^6.19.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "unpdf": "^2.2.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.19.0",
+    "eslint": "^9.39.5",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.3"
+  }
+}

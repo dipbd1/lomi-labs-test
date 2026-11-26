@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentType {
+  invoice
+  lease
+  market_report
+}
+
+enum VersionStatus {
+  queued
+  extracting
+  extracted
+  failed
+}
+
+enum ReviewState {
+  pending
+  approved
+  corrected
+  carried_over
+}
+
+enum ReviewAction {
+  approve
+  correct
+}
+
+model Document {
+  id        String            @id
+  type      DocumentType
+  title     String
+  createdAt DateTime          @default(now())
+  versions  DocumentVersion[]
+}
+
+model DocumentVersion {
+  id         String           @id
+  documentId String
+  document   Document         @relation(fields: [documentId], references: [id])
+  number     Int
+  pdfPath    String
+  parsedText String?
+  status     VersionStatus    @default(queued)
+  error      String?
+  createdAt  DateTime         @default(now())
+  values     ExtractedValue[]
+  runs       ExtractionRun[]
+
+  @@unique([documentId, number])
+  @@index([status])
+}
+
+model ExtractionRun {
+  id          String          @id @default(cuid())
+  versionId   String
+  version     DocumentVersion @relation(fields: [versionId], references: [id])
+  prompt      String
+  rawResponse String?
+  createdAt   DateTime        @default(now())
+}
+
+model ExtractedValue {
+  id              String           @id @default(cuid())
+  versionId       String
+  version         DocumentVersion  @relation(fields: [versionId], references: [id])
+  fieldKey        String
+  value           String?
+  gapReason       String?
+  evidence        String?
+  reviewState     ReviewState      @default(pending)
+  carriedFromId   String?
+  carriedFrom     ExtractedValue?  @relation("CarriedFrom", fields: [carriedFromId], references: [id])
+  carriedTo       ExtractedValue[] @relation("CarriedFrom")
+  previousValueId String?
+  previousValue   ExtractedValue?  @relation("PreviousValue", fields: [previousValueId], references: [id])
+  laterValues     ExtractedValue[] @relation("PreviousValue")
+  reviews         Review[]
+
+  @@unique([versionId, fieldKey])
+}
+
+model Review {
+  id             String         @id @default(cuid())
+  valueId        String
+  value          ExtractedValue @relation(fields: [valueId], references: [id])
+  action         ReviewAction
+  correctedValue String?
+  note           String?
+  createdAt      DateTime       @default(now())
+
+  @@index([valueId])
+}
