@@ -1,3 +1,4 @@
+import './load-env'
 import { documentTypeSchema } from '@lomi/contracts'
 import { PrismaClient } from '@prisma/client'
 import { copyFile, mkdir, readFile } from 'node:fs/promises'
