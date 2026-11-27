@@ -22,7 +22,7 @@ Open http://localhost:8080. The API is on http://localhost:3000. Postgres and Re
 
 The list shows three seeded documents. Open one, wait until the badge says `extracted`, then approve or correct a field. Pending rows and gaps are at the top. To try carry-over, open the Meridian invoice and upload `fixtures/documents/invoice-001.v2.pdf` as a new version. Fields whose evidence did not change come back carried over. The two that changed come back pending, with the previous value beside them.
 
-The browser talks to `/api/...`. nginx (and the Vite dev server) proxy that to the API, which serves `/documents` and `/values` with no prefix. A missing API key still lets the stack boot. Those extractions finish as `failed`, with a retry button on the current version.
+The browser talks to `/api/...`. nginx (and the Vite dev server) proxy that to the API, which serves `/documents` and `/values` with no prefix. In local dev, Vite holds each `/api` request until `GET /health` on port 3000 succeeds, so a refresh while the API is still compiling is not refused. A missing API key still lets the stack boot. Those extractions finish as `failed`, with a retry button on the current version.
 
 Unit tests, lint, and the build do not need Docker:
 
