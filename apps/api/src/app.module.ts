@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
-import { ApiController } from './api.controller'
-import { DocumentsService } from './documents.service'
-import { ExtractionQueue } from './extraction.queue'
-import { PrismaService } from './prisma.service'
+import { ApiController } from './documents/api.controller'
+import { DocumentsService } from './documents/documents.service'
+import { PrismaService } from './documents/prisma.service'
+import { ExtractionQueue } from './extraction/extraction.queue'
 
 @Module({
   controllers: [ApiController],

@@ -15,8 +15,8 @@ import {
 } from '@lomi/contracts'
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Prisma, type Document } from '@prisma/client'
+import { ExtractionQueue } from '../extraction/extraction.queue'
 import { countProgress } from './progress'
-import { ExtractionQueue } from './extraction.queue'
 import { PrismaService } from './prisma.service'
 
 type UploadedPdf = {

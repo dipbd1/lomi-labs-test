@@ -1,10 +1,10 @@
 import type { DocumentType } from '@lomi/contracts'
 import { fieldsFor } from '@lomi/contracts'
 import type { PrismaClient } from '@prisma/client'
+import { buildPrompt, parseModelFields, type ModelField } from '../inference/gemini'
+import { generateExtraction, resolveInference } from '../inference/inference'
 import { decideCarryOver } from './carry-over'
 import { applyEvidence } from './evidence'
-import { buildPrompt, parseModelFields, type ModelField } from './gemini'
-import { generateExtraction, resolveInference } from './inference'
 import { readPdf } from './pdf'
 import { planFieldWrites } from './recovery'
 

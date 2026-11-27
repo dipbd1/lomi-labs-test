@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fieldCatalog } from '@lomi/contracts'
-import { countProgress } from './progress'
+import { countProgress } from '../documents/progress'
 import { extractionJobId, planFieldWrites, versionsToRequeue, waitForPrevious } from './recovery'
 
 test('a version left in extracting or queued is enqueued again', () => {
@@ -59,7 +59,7 @@ test('gaps count as pending and a carried-over value counts only as carried over
 
 test('field catalog matches the fixture', () => {
   const fixture = JSON.parse(
-    readFileSync(path.resolve(__dirname, '../../../fixtures/expected-fields.json'), 'utf8'),
+    readFileSync(path.resolve(__dirname, '../../../../fixtures/expected-fields.json'), 'utf8'),
   ) as unknown
   assert.deepEqual(fixture, fieldCatalog)
 })

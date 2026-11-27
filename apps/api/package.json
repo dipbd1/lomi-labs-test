@@ -7,7 +7,7 @@
     "dev": "tsc-watch -p tsconfig.json --noClear --onSuccess \"node dist/main.js\"",
     "lint": "eslint src",
     "seed": "tsx src/seed.ts",
-    "test": "tsx --test src/*.spec.ts"
+    "test": "tsx --test src/*/*.spec.ts"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",

@@ -1,8 +1,8 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { DelayedError, Queue, Worker, type Job } from 'bullmq'
 import type { RedisOptions } from 'ioredis'
+import { PrismaService } from '../documents/prisma.service'
 import { runExtraction } from './extract'
-import { PrismaService } from './prisma.service'
 import { extractionJobId, waitForPrevious } from './recovery'
 
 function redisOptions(): RedisOptions {

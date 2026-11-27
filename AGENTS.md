@@ -33,7 +33,7 @@ Copy `.env.example` to `.env` and set `GEMINI_API_KEY` before expecting extracti
 - Approve is rejected on a gap. Correct is allowed.
 - Carry-over requires normalized evidence to match and a review to copy. Unreviewed unchanged evidence stays `pending`.
 - Do not seed invoice version 2. Do not reset an existing fixture document.
-- `unpdf` is ESM-only and is loaded dynamically. Keep the `Iterator` shim in `apps/api/src/pdf.ts`; the bundled PDF.js build reads that global, which Node 20 does not define.
+- `unpdf` is ESM-only and is loaded dynamically. Keep the `Iterator` shim in `apps/api/src/extraction/pdf.ts`; the bundled PDF.js build reads that global, which Node 20 does not define.
 - Keep the Postgres and Redis `mem_limit: 2g` caps, and the smaller memory settings under them, in `docker-compose.yml`.
 
 ## Code
