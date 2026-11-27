@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "DATABASE_URL=${DATABASE_URL:-postgresql://lomi:lomi@localhost:5432/lomi} prisma generate && tsc -p tsconfig.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "tsc-watch -p tsconfig.json --noClear --onSuccess \"node dist/main.js\"",
     "lint": "eslint src",
     "seed": "tsx src/seed.ts",
     "test": "tsx --test src/*.spec.ts"
@@ -28,6 +28,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.19.0",
     "eslint": "^9.39.5",
+    "tsc-watch": "^7.2.1",
     "tsx": "^4.20.3",
     "typescript": "^5.9.3"
   }
