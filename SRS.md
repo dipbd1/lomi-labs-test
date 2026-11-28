@@ -153,3 +153,15 @@ Acceptance:
 ## FR-16 Non-goals
 
 There is no authentication, no highlighting of a quote inside the parsed text, and no hosted deployment. The worker runs in the API process. Those are intentional cuts.
+
+## FR-17 Clear data
+
+`DELETE /documents` removes every document, version, extracted value, review, and extraction run, deletes the stored PDF files, and removes extraction jobs. The list is empty afterward. Startup seeding is unchanged: the next process start creates fixture version 1 only when those documents are absent.
+
+Acceptance:
+
+- After the call, `GET /documents` is an empty list.
+- A version that was queued or extracting is not extracted after the call.
+- Stored PDF files for those versions are removed.
+- A second call returns a deleted count of zero.
+- The list screen has a control that calls this endpoint and shows the empty list.

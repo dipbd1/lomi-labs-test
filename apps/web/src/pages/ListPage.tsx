@@ -1,4 +1,4 @@
-import type { DocumentListItem, DocumentType } from '@lomi/contracts'
+import type { ClearedDocuments, DocumentListItem, DocumentType } from '@lomi/contracts'
 import {
   Alert,
   Badge,
@@ -66,6 +66,21 @@ export function ListPage() {
     }
   }, [nonce])
 
+  async function clearData() {
+    if (busy) return
+    if (!window.confirm('Delete every document, review, and stored PDF?')) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api<ClearedDocuments>('/api/documents', { method: 'DELETE' })
+      setNonce((value) => value + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Clear failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function upload() {
     if (!file || !type) {
       setError('Choose a PDF and a document type')
@@ -112,6 +127,9 @@ export function ListPage() {
           />
           <Button onClick={() => void upload()} loading={busy}>
             Upload
+          </Button>
+          <Button color="red" variant="light" onClick={() => void clearData()} loading={busy}>
+            Clear data
           </Button>
         </Group>
       </Paper>

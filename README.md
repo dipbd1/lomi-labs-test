@@ -18,7 +18,7 @@ To run the same extraction through OpenRouter, set `USE_OPENROUTER=true` and `OP
 docker compose up --build
 ```
 
-Open http://localhost:8080. The API is on http://localhost:3000. Postgres and Redis start first. The API container waits until both are healthy, runs `prisma migrate deploy`, seeds version 1 of each fixture, then boots. The seed skips any fixture document that already exists, so a restart does not extract version 1 again.
+Open http://localhost:8080. The API is on http://localhost:3000. Postgres and Redis start first. The API container waits until both are healthy, runs `prisma migrate deploy`, seeds version 1 of each fixture, then boots. The seed skips any fixture document that already exists, so a restart does not extract version 1 again. Clear data on the list deletes every stored document, review, extraction run, and PDF, and removes extraction jobs. The list stays empty until the next boot, which seeds the fixtures again because they are absent.
 
 The list shows three seeded documents. Open one, wait until the badge says `extracted`, then approve or correct a field. Pending rows and gaps are at the top. To try carry-over, open the Meridian invoice and upload `fixtures/documents/invoice-001.v2.pdf` as a new version. Fields whose evidence did not change come back carried over. The two that changed come back pending, with the previous value beside them.
 

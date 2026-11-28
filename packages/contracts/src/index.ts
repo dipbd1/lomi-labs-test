@@ -126,6 +126,10 @@ export type DocumentListItem = {
   progress: ProgressCounts
 }
 
+export type ClearedDocuments = {
+  deleted: number
+}
+
 export type CreatedDocument = {
   id: string
   title: string

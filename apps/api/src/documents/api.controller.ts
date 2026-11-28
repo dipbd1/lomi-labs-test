@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -35,6 +36,11 @@ export class ApiController {
   @Get('documents')
   list() {
     return this.documents.list()
+  }
+
+  @Delete('documents')
+  clear() {
+    return this.documents.clear()
   }
 
   @Post('documents')

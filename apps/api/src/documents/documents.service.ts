@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
   documentTypeSchema,
   fieldsFor,
   reviewRequestSchema,
+  type ClearedDocuments,
   type CreatedDocument,
   type DocumentDetail,
   type DocumentListItem,
@@ -18,6 +19,7 @@ import { Prisma, type Document } from '@prisma/client'
 import { ExtractionQueue } from '../extraction/extraction.queue'
 import { countProgress } from './progress'
 import { PrismaService } from './prisma.service'
+import { pathsInsideDirectory } from './stored-pdf'
 
 type UploadedPdf = {
   originalname: string
@@ -40,6 +42,10 @@ function documentTitle(fileName: string, title?: string): string {
   const trimmed = title?.trim()
   if (trimmed) return trimmed
   return fileName.replace(/\.pdf$/i, '') || fileName
+}
+
+function isMissingFile(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 function assertPdf(file: UploadedPdf) {
@@ -151,6 +157,27 @@ export class DocumentsService {
       type: document.type,
       versionNumber: number,
       status: 'queued',
+    }
+  }
+
+  async clear(): Promise<ClearedDocuments> {
+    await this.queue.pauseAndDrain()
+    try {
+      const versions = await this.prisma.documentVersion.findMany({ select: { pdfPath: true } })
+      const deleted = await this.prisma.$transaction(async (tx) => {
+        const count = await tx.document.count()
+        await tx.review.deleteMany()
+        await tx.extractedValue.updateMany({ data: { carriedFromId: null, previousValueId: null } })
+        await tx.extractedValue.deleteMany()
+        await tx.extractionRun.deleteMany()
+        await tx.documentVersion.deleteMany()
+        await tx.document.deleteMany()
+        return count
+      })
+      await this.removePdfs(versions.map((version) => version.pdfPath))
+      return { deleted }
+    } finally {
+      await this.queue.resume()
     }
   }
 
@@ -305,6 +332,17 @@ export class DocumentsService {
     const pdfPath = path.join(directory, `${versionId}.pdf`)
     await writeFile(pdfPath, bytes)
     return pdfPath
+  }
+
+  private async removePdfs(pdfPaths: string[]) {
+    for (const pdfPath of pathsInsideDirectory(pdfDirectory(), pdfPaths)) {
+      try {
+        await unlink(pdfPath)
+      } catch (error) {
+        if (isMissingFile(error)) continue
+        throw error
+      }
+    }
   }
 
   private async enqueue(versionId: string) {
