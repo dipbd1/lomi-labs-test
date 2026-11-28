@@ -7,6 +7,7 @@ import {
   FileInput,
   Group,
   Menu,
+  Modal,
   Paper,
   Select,
   Stack,
@@ -43,6 +44,7 @@ export function ListPage() {
   const [file, setFile] = useState<File | null>(null)
   const [type, setType] = useState<DocumentType | null>('invoice')
   const [busy, setBusy] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
@@ -84,9 +86,13 @@ export function ListPage() {
     }
   }
 
+  function askClear() {
+    if (busy) return
+    setConfirmClear(true)
+  }
+
   async function clearData() {
     if (busy) return
-    if (!window.confirm('Delete every document, review, and stored PDF?')) return
     setBusy(true)
     setError(null)
     try {
@@ -96,6 +102,7 @@ export function ListPage() {
       setError(err instanceof Error ? err.message : 'Clear failed')
     } finally {
       setBusy(false)
+      setConfirmClear(false)
     }
   }
 
@@ -146,11 +153,32 @@ export function ListPage() {
           <Button onClick={() => void upload()} loading={busy}>
             Upload
           </Button>
-          <Button color="red" variant="light" onClick={() => void clearData()} loading={busy}>
+          <Button color="red" variant="light" onClick={askClear} loading={busy}>
             Clear data
           </Button>
         </Group>
       </Paper>
+      <Modal
+        opened={confirmClear}
+        onClose={() => {
+          if (busy) return
+          setConfirmClear(false)
+        }}
+        title="Clear data"
+        size="sm"
+      >
+        <Stack>
+          <Text>Delete every document, review, and stored PDF?</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setConfirmClear(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={() => void clearData()} loading={busy}>
+              Delete all
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
       {error ? <Alert color="red">{error}</Alert> : null}
       <Table.ScrollContainer minWidth={720}>
         <Table highlightOnHover>

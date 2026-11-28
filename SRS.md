@@ -161,13 +161,15 @@ There is no authentication, no highlighting of a quote inside the parsed text, a
 
 `DELETE /documents` removes every document, version, extracted value, review, and extraction run, deletes the stored PDF files, and removes extraction jobs. The list is empty afterward. Startup seeding is unchanged: the next process start creates fixture version 1 only when those documents are absent.
 
+The list control opens a confirmation modal. Confirming calls this endpoint and shows the empty list. Cancel leaves the documents in place.
+
 Acceptance:
 
 - After the call, `GET /documents` is an empty list.
 - A version that was queued or extracting is not extracted after the call.
 - Stored PDF files for those versions are removed.
 - A second call returns a deleted count of zero.
-- The list screen has a control that calls this endpoint and shows the empty list.
+- The list screen has a control that opens a confirmation modal. Confirming calls this endpoint and shows the empty list. Cancel does not delete.
 
 ## FR-18 Delete one document
 
