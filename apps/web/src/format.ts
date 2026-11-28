@@ -1,4 +1,4 @@
-import type { DocumentType, ReviewState, VersionStatus } from '@lomi/contracts'
+import type { DocumentType, ReviewAction, ReviewState, VersionStatus } from '@lomi/contracts'
 
 export function statusColor(status: VersionStatus): string {
   switch (status) {
@@ -59,4 +59,25 @@ export function fieldLabel(fieldKey: string): string {
 export function attentionRank(value: { reviewState: ReviewState; value: string | null }): number {
   if (value.reviewState === 'pending' || value.value === null) return 0
   return 1
+}
+
+export function canApprove(value: {
+  value: string | null
+  reviewState: ReviewState
+  latestReview: { action: ReviewAction } | null
+}): boolean {
+  if (value.value === null) return false
+  switch (value.reviewState) {
+    case 'pending':
+    case 'corrected':
+      return true
+    case 'approved':
+      return false
+    case 'carried_over':
+      return value.latestReview?.action === 'correct'
+    default: {
+      const unreachable: never = value.reviewState
+      return unreachable
+    }
+  }
 }

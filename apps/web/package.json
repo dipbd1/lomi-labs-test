@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "dev": "vite --port 8080 --host",
     "lint": "eslint src",
-    "test": "node --test hold-for-api.test.mjs"
+    "test": "node --test hold-for-api.test.mjs && tsx --test format.spec.ts"
   },
   "dependencies": {
     "@lomi/contracts": "workspace:*",

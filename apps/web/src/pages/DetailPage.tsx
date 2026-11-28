@@ -17,7 +17,7 @@ import {
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
-import { attentionRank, fieldLabel, reviewColor, statusColor, typeLabel } from '../format'
+import { attentionRank, canApprove, fieldLabel, reviewColor, statusColor, typeLabel } from '../format'
 
 export function DetailPage() {
   const params = useParams()
@@ -186,13 +186,15 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
   const [open, setOpen] = useState(false)
   const [corrected, setCorrected] = useState('')
   const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [pending, setPending] = useState<'approve' | 'correct' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const standing = value.latestReview?.action === 'correct' ? value.latestReview.value : null
   const quiet = value.reviewState === 'carried_over'
+  const allowApprove = canApprove(value)
 
   async function approve() {
-    setBusy(true)
+    if (!allowApprove || pending) return
+    setPending('approve')
     setError(null)
     try {
       await api(`/api/values/${value.id}/review`, {
@@ -204,7 +206,7 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approve failed')
     } finally {
-      setBusy(false)
+      setPending(null)
     }
   }
 
@@ -220,7 +222,8 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
       setError('Enter a corrected value')
       return
     }
-    setBusy(true)
+    if (pending) return
+    setPending('correct')
     setError(null)
     const payload: { action: 'correct'; value: string; note?: string } = {
       action: 'correct',
@@ -240,7 +243,7 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Correction failed')
     } finally {
-      setBusy(false)
+      setPending(null)
     }
   }
 
@@ -276,11 +279,18 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
       <Table.Td>
         <Stack gap="xs">
           {value.value !== null ? (
-            <Button size="xs" variant="light" onClick={() => void approve()} loading={busy}>
+            <Button
+              size="xs"
+              variant={allowApprove ? 'filled' : 'default'}
+              color={allowApprove ? 'blue' : 'gray'}
+              disabled={!allowApprove || pending !== null}
+              loading={pending === 'approve'}
+              onClick={() => void approve()}
+            >
               Approve
             </Button>
           ) : null}
-          <Button size="xs" variant="default" onClick={() => setOpen((current) => !current)}>
+          <Button size="xs" variant="default" onClick={() => setOpen((current) => !current)} disabled={pending !== null}>
             Correct
           </Button>
           {open ? (
@@ -297,10 +307,10 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
                 minRows={2}
               />
               <Group gap="xs">
-                <Button size="xs" onClick={() => void correct()} loading={busy}>
+                <Button size="xs" onClick={() => void correct()} loading={pending === 'correct'} disabled={pending !== null}>
                   Save correction
                 </Button>
-                <Button size="xs" variant="default" onClick={cancel} disabled={busy}>
+                <Button size="xs" variant="default" onClick={cancel} disabled={pending !== null}>
                   Cancel
                 </Button>
               </Group>
