@@ -4,21 +4,19 @@ import {
   Alert,
   Badge,
   Button,
-  FileInput,
   Group,
   Menu,
   Modal,
-  Paper,
   Select,
   Stack,
   Table,
   Text,
   Title,
 } from '@mantine/core'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { statusColor, typeLabel } from '../format'
+import { formatBytes, isPdfFile, statusColor, typeLabel } from '../format'
 
 const typeOptions = [
   { value: 'invoice', label: 'Invoice' },
@@ -42,10 +40,13 @@ export function ListPage() {
   const [documents, setDocuments] = useState<DocumentListItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [type, setType] = useState<DocumentType | null>('invoice')
+  const [type, setType] = useState<DocumentType>('invoice')
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [nonce, setNonce] = useState(0)
+  const picker = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let stop = false
@@ -87,7 +88,7 @@ export function ListPage() {
   }
 
   function askClear() {
-    if (busy) return
+    if (busy || uploading || file) return
     setConfirmClear(true)
   }
 
@@ -106,58 +107,110 @@ export function ListPage() {
     }
   }
 
-  async function upload() {
-    if (!file || !type) {
-      setError('Choose a PDF and a document type')
+  function openPicker() {
+    if (busy || uploading || file) return
+    picker.current?.click()
+  }
+
+  function onPick(event: ChangeEvent<HTMLInputElement>) {
+    const next = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!next) return
+    if (!isPdfFile(next)) {
+      setError('Choose a PDF')
       return
     }
-    setBusy(true)
     setError(null)
+    setUploadError(null)
+    setType('invoice')
+    setFile(next)
+  }
+
+  function closeUpload() {
+    if (uploading) return
+    setFile(null)
+    setUploadError(null)
+    setType('invoice')
+  }
+
+  async function upload() {
+    if (!file || uploading || busy) return
+    setUploading(true)
+    setUploadError(null)
     const body = new FormData()
     body.set('file', file)
     body.set('type', type)
     try {
       await api('/api/documents', { method: 'POST', body })
       setFile(null)
+      setUploadError(null)
+      setType('invoice')
       setNonce((value) => value + 1)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
-      setBusy(false)
+      setUploading(false)
     }
   }
 
   return (
     <Stack>
-      <Title order={2}>Documents</Title>
-      <Paper withBorder p="md">
-        <Group align="flex-end">
-          <FileInput
-            label="PDF"
-            placeholder="Choose a file"
-            accept="application/pdf,.pdf"
-            value={file}
-            onChange={setFile}
-            style={{ flex: 1 }}
-          />
-          <Select
-            label="Type"
-            data={typeOptions}
-            value={type}
-            onChange={(value) => {
-              if (isDocumentType(value)) setType(value)
-            }}
-            allowDeselect={false}
-            w={200}
-          />
-          <Button onClick={() => void upload()} loading={busy}>
-            Upload
-          </Button>
-          <Button color="red" variant="light" onClick={askClear} loading={busy}>
-            Clear data
-          </Button>
-        </Group>
-      </Paper>
+      <Group justify="space-between" align="center">
+        <Title order={2} mb={0}>
+          Documents
+        </Title>
+        <Button color="red" variant="light" onClick={askClear} loading={busy} disabled={uploading || file !== null}>
+          Clear data
+        </Button>
+      </Group>
+      <Button onClick={openPicker} disabled={busy || uploading || file !== null} w="fit-content">
+        Upload
+      </Button>
+      <input
+        ref={picker}
+        type="file"
+        accept="application/pdf,.pdf"
+        hidden
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={onPick}
+      />
+      <Modal
+        opened={file !== null}
+        onClose={closeUpload}
+        title={file?.name}
+        size="sm"
+        closeOnClickOutside={!uploading}
+        closeOnEscape={!uploading}
+        withCloseButton={!uploading}
+      >
+        {file ? (
+          <Stack>
+            <Text size="sm" c="dimmed">
+              {formatBytes(file.size)}
+            </Text>
+            <Select
+              label="Type"
+              data={typeOptions}
+              value={type}
+              onChange={(value) => {
+                if (isDocumentType(value)) setType(value)
+              }}
+              allowDeselect={false}
+              disabled={uploading}
+            />
+            {uploadError ? <Alert color="red">{uploadError}</Alert> : null}
+            <Group justify="flex-end">
+              <Button variant="default" onClick={closeUpload} disabled={uploading}>
+                Cancel
+              </Button>
+              <Button onClick={() => void upload()} loading={uploading}>
+                Add document
+              </Button>
+            </Group>
+          </Stack>
+        ) : null}
+      </Modal>
       <Modal
         opened={confirmClear}
         onClose={() => {

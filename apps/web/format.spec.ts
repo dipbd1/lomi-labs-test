@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { canApprove } from './src/format'
+import { canApprove, formatBytes, isPdfFile } from './src/format'
 
 const review = (action: 'approve' | 'correct') => ({ action })
 
@@ -21,4 +21,21 @@ test('carry-over follows the copied review', () => {
 
 test('a gap cannot be approved', () => {
   assert.equal(canApprove({ value: null, reviewState: 'pending', latestReview: null }), false)
+})
+
+test('a pdf is recognized by type or extension', () => {
+  assert.equal(isPdfFile({ name: 'invoice.txt', type: 'application/pdf' }), true)
+  assert.equal(isPdfFile({ name: 'Invoice.PDF', type: '' }), true)
+  assert.equal(isPdfFile({ name: 'notes.txt', type: 'text/plain' }), false)
+  assert.equal(isPdfFile({ name: 'file.pdf.exe', type: 'application/octet-stream' }), false)
+})
+
+test('file sizes use bytes until the next unit', () => {
+  assert.equal(formatBytes(0), '0 B')
+  assert.equal(formatBytes(512), '512 B')
+  assert.equal(formatBytes(1024), '1 KB')
+  assert.equal(formatBytes(1536), '1.5 KB')
+  assert.equal(formatBytes(10 * 1024), '10 KB')
+  assert.equal(formatBytes(1024 * 1024), '1 MB')
+  assert.equal(formatBytes(Number.NaN), '0 B')
 })

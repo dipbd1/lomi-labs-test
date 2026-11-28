@@ -4,8 +4,8 @@ import {
   Alert,
   Badge,
   Button,
-  FileInput,
   Group,
+  Modal,
   Select,
   Stack,
   Table,
@@ -14,10 +14,10 @@ import {
   TextInput,
   Title,
 } from '@mantine/core'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
-import { attentionRank, canApprove, fieldLabel, reviewColor, statusColor, typeLabel } from '../format'
+import { attentionRank, canApprove, fieldLabel, formatBytes, isPdfFile, reviewColor, statusColor, typeLabel } from '../format'
 
 export function DetailPage() {
   const params = useParams()
@@ -28,6 +28,9 @@ export function DetailPage() {
   const [nonce, setNonce] = useState(0)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const picker = useRef<HTMLInputElement>(null)
 
   const path = !id ? '' : selection == null ? `/api/documents/${id}` : `/api/documents/${id}/versions/${selection}`
 
@@ -58,21 +61,46 @@ export function DetailPage() {
 
   if (!id) return <Text>Missing document.</Text>
 
-  async function uploadVersion() {
-    if (!id || !file) return
-    setBusy(true)
+  function openPicker() {
+    if (!id || busy || uploading || file) return
+    picker.current?.click()
+  }
+
+  function onPick(event: ChangeEvent<HTMLInputElement>) {
+    const next = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!next) return
+    if (!isPdfFile(next)) {
+      setError('Choose a PDF')
+      return
+    }
     setError(null)
+    setUploadError(null)
+    setFile(next)
+  }
+
+  function closeUpload() {
+    if (uploading) return
+    setFile(null)
+    setUploadError(null)
+  }
+
+  async function uploadVersion() {
+    if (!id || !file || uploading || busy) return
+    setUploading(true)
+    setUploadError(null)
     const body = new FormData()
     body.set('file', file)
     try {
       const created = await api<CreatedDocument>(`/api/documents/${id}/versions`, { method: 'POST', body })
       setFile(null)
+      setUploadError(null)
       setSelection(created.versionNumber)
       setNonce((value) => value + 1)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
-      setBusy(false)
+      setUploading(false)
     }
   }
 
@@ -163,19 +191,44 @@ export function DetailPage() {
               </Accordion.Panel>
             </Accordion.Item>
           </Accordion>
-          <Group align="flex-end">
-            <FileInput
-              label="New version"
-              placeholder="Revised PDF"
-              accept="application/pdf,.pdf"
-              value={file}
-              onChange={setFile}
-              style={{ flex: 1 }}
-            />
-            <Button onClick={() => void uploadVersion()} loading={busy} disabled={!file}>
-              Upload version
-            </Button>
-          </Group>
+          <Button onClick={openPicker} disabled={busy || uploading || file !== null} w="fit-content">
+            Upload version
+          </Button>
+          <input
+            ref={picker}
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={onPick}
+          />
+          <Modal
+            opened={file !== null}
+            onClose={closeUpload}
+            title={file?.name}
+            size="sm"
+            closeOnClickOutside={!uploading}
+            closeOnEscape={!uploading}
+            withCloseButton={!uploading}
+          >
+            {file ? (
+              <Stack>
+                <Text size="sm" c="dimmed">
+                  {formatBytes(file.size)}
+                </Text>
+                {uploadError ? <Alert color="red">{uploadError}</Alert> : null}
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={closeUpload} disabled={uploading}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => void uploadVersion()} loading={uploading}>
+                    Upload version
+                  </Button>
+                </Group>
+              </Stack>
+            ) : null}
+          </Modal>
         </>
       )}
     </Stack>

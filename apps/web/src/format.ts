@@ -61,6 +61,24 @@ export function attentionRank(value: { reviewState: ReviewState; value: string |
   return 1
 }
 
+export function isPdfFile(file: { name: string; type: string }): boolean {
+  if (file.type === 'application/pdf') return true
+  return file.name.toLowerCase().endsWith('.pdf')
+}
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unit = 0
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024
+    unit += 1
+  }
+  const rounded = unit === 0 || size >= 10 ? Math.round(size) : Math.round(size * 10) / 10
+  return `${rounded} ${units[unit]}`
+}
+
 export function canApprove(value: {
   value: string | null
   reviewState: ReviewState
