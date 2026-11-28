@@ -54,6 +54,31 @@ function assertPdf(file: UploadedPdf) {
   }
 }
 
+type PurgeScope = 'all' | { documentId: string; versionIds: string[] }
+
+async function purgeDocuments(tx: Prisma.TransactionClient, scope: PurgeScope): Promise<number> {
+  if (scope === 'all') {
+    const count = await tx.document.count()
+    await tx.review.deleteMany()
+    await tx.extractedValue.updateMany({ data: { carriedFromId: null, previousValueId: null } })
+    await tx.extractedValue.deleteMany()
+    await tx.extractionRun.deleteMany()
+    await tx.documentVersion.deleteMany()
+    await tx.document.deleteMany()
+    return count
+  }
+  await tx.review.deleteMany({ where: { value: { versionId: { in: scope.versionIds } } } })
+  await tx.extractedValue.updateMany({
+    where: { versionId: { in: scope.versionIds } },
+    data: { carriedFromId: null, previousValueId: null },
+  })
+  await tx.extractedValue.deleteMany({ where: { versionId: { in: scope.versionIds } } })
+  await tx.extractionRun.deleteMany({ where: { versionId: { in: scope.versionIds } } })
+  await tx.documentVersion.deleteMany({ where: { documentId: scope.documentId } })
+  await tx.document.delete({ where: { id: scope.documentId } })
+  return 1
+}
+
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name)
@@ -164,16 +189,7 @@ export class DocumentsService {
     await this.queue.pauseAndDrain()
     try {
       const versions = await this.prisma.documentVersion.findMany({ select: { pdfPath: true } })
-      const deleted = await this.prisma.$transaction(async (tx) => {
-        const count = await tx.document.count()
-        await tx.review.deleteMany()
-        await tx.extractedValue.updateMany({ data: { carriedFromId: null, previousValueId: null } })
-        await tx.extractedValue.deleteMany()
-        await tx.extractionRun.deleteMany()
-        await tx.documentVersion.deleteMany()
-        await tx.document.deleteMany()
-        return count
-      })
+      const deleted = await this.prisma.$transaction((tx) => purgeDocuments(tx, 'all'))
       await this.removePdfs(versions.map((version) => version.pdfPath))
       return { deleted }
     } finally {
@@ -189,17 +205,7 @@ export class DocumentsService {
     })
     const versionIds = versions.map((version) => version.id)
     await this.removeJobs(versionIds)
-    await this.prisma.$transaction(async (tx) => {
-      await tx.review.deleteMany({ where: { value: { versionId: { in: versionIds } } } })
-      await tx.extractedValue.updateMany({
-        where: { versionId: { in: versionIds } },
-        data: { carriedFromId: null, previousValueId: null },
-      })
-      await tx.extractedValue.deleteMany({ where: { versionId: { in: versionIds } } })
-      await tx.extractionRun.deleteMany({ where: { versionId: { in: versionIds } } })
-      await tx.documentVersion.deleteMany({ where: { documentId: id } })
-      await tx.document.delete({ where: { id } })
-    })
+    await this.prisma.$transaction((tx) => purgeDocuments(tx, { documentId: id, versionIds }))
     await this.removePdfs(versions.map((version) => version.pdfPath))
     await this.removeJobs(versionIds)
     return { deleted: 1 }

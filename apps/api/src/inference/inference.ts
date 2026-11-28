@@ -35,9 +35,9 @@ export function resolveInference(env: Record<string, string | undefined> = proce
   }
 }
 
-export async function generateExtraction(type: DocumentType, prompt: string): Promise<string> {
-  const target = resolveInference()
-  if (!target.apiKey) throw new Error(target.missingKeyMessage)
+type ReadyInference = Pick<InferenceTarget, 'provider' | 'model'> & { apiKey: string }
+
+export async function generateExtraction(target: ReadyInference, type: DocumentType, prompt: string): Promise<string> {
   switch (target.provider) {
     case 'gemini':
       return generateGemini(prompt, target.apiKey, target.model, type)

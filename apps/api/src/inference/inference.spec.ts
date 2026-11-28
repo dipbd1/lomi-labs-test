@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { extractionResponseSchema } from './gemini'
+import { extractionResponseSchema } from './contract'
 import { resolveInference } from './inference'
 import { openRouterContent, openRouterRequest } from './openrouter'
 

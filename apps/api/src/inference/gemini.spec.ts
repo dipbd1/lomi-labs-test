@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { documentTypes, fieldsFor } from '@lomi/contracts'
-import { buildPrompt, extractionResponseSchema, parseModelFields } from './gemini'
+import { buildPrompt, extractionResponseSchema, parseModelFields } from './contract'
 
 type Schema = {
   type?: string
@@ -71,7 +71,7 @@ test('schema allows null evidence only when value is null', () => {
   }
 })
 
-test('parser reads an object of fields and still reads a fields array', () => {
+test('parser reads an object of fields', () => {
   assert.deepEqual(
     parseModelFields(
       JSON.stringify({
@@ -83,14 +83,6 @@ test('parser reads an object of fields and still reads a fields array', () => {
       { field: 'tenant_name', value: 'Ada', evidence: 'Tenant Ada', gapReason: null },
       { field: 'monthly_rent', value: null, evidence: null, gapReason: 'Not stated' },
     ],
-  )
-  assert.deepEqual(
-    parseModelFields(
-      JSON.stringify({
-        fields: [{ field: 'invoice_number', value: '100', evidence: null, gapReason: null }],
-      }),
-    ),
-    [{ field: 'invoice_number', value: '100', evidence: null, gapReason: null }],
   )
 })
 

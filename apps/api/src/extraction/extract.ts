@@ -1,7 +1,7 @@
 import type { DocumentType } from '@lomi/contracts'
 import { fieldsFor } from '@lomi/contracts'
 import type { PrismaClient } from '@prisma/client'
-import { buildPrompt, parseModelFields, type ModelField } from '../inference/gemini'
+import { buildPrompt, parseModelFields, type ModelField } from '../inference/contract'
 import { generateExtraction, resolveInference } from '../inference/inference'
 import { decideCarryOver } from './carry-over'
 import { applyEvidence } from './evidence'
@@ -44,7 +44,11 @@ export async function runExtraction(prisma: PrismaClient, versionId: string): Pr
   const prompt = buildPrompt(version.document.type, text)
   let raw: string
   try {
-    raw = await generateExtraction(version.document.type, prompt)
+    raw = await generateExtraction(
+      { provider: target.provider, apiKey: target.apiKey, model: target.model },
+      version.document.type,
+      prompt,
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Model request failed'
     await prisma.extractionRun.create({ data: { versionId, prompt, rawResponse: message } })

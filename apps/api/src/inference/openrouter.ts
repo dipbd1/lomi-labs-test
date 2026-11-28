@@ -1,5 +1,5 @@
 import type { DocumentType } from '@lomi/contracts'
-import { extractionResponseSchema } from './gemini'
+import { extractionResponseSchema } from './contract'
 
 export function openRouterRequest(prompt: string, model: string, type: DocumentType) {
   return {

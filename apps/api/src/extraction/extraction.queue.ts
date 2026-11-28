@@ -56,30 +56,33 @@ export class ExtractionQueue implements OnModuleDestroy {
     this.worker.resume()
   }
 
-  async remove(versionId: string): Promise<void> {
+  async remove(versionId: string): Promise<'absent' | 'removed' | 'active'> {
     const existing = await this.queue.getJob(extractionJobId(versionId))
-    if (!existing) return
+    if (!existing) return 'absent'
     try {
       await existing.remove()
+      return 'removed'
     } catch (error) {
       const state = await existing.getState()
-      if (state === 'active') return
+      if (state === 'active') return 'active'
       throw error
     }
   }
 
   async enqueue(versionId: string): Promise<void> {
-    const jobId = extractionJobId(versionId)
-    const existing = await this.queue.getJob(jobId)
-    if (existing) {
-      try {
-        await existing.remove()
-      } catch (error) {
-        const state = await existing.getState()
-        if (state === 'active') return
-        throw error
+    const outcome = await this.remove(versionId)
+    switch (outcome) {
+      case 'active':
+        return
+      case 'absent':
+      case 'removed':
+        break
+      default: {
+        const unreachable: never = outcome
+        throw new Error(unreachable)
       }
     }
+    const jobId = extractionJobId(versionId)
     await this.queue.add(
       'extract',
       { versionId },

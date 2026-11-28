@@ -1,122 +1,53 @@
 import type { CreatedDocument, DocumentDetail, ExtractedValueView, ReviewView } from '@lomi/contracts'
-import {
-  Accordion,
-  Alert,
-  Badge,
-  Button,
-  Group,
-  Modal,
-  Select,
-  Stack,
-  Table,
-  Text,
-  Textarea,
-  TextInput,
-  Title,
-} from '@mantine/core'
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { Accordion, Alert, Badge, Button, Group, Select, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
-import { attentionRank, canApprove, fieldLabel, formatBytes, isPdfFile, reviewColor, statusColor, typeLabel } from '../format'
+import { attentionRank, canApprove, fieldLabel, reviewColor, statusColor, typeLabel } from '../format'
+import { PdfUpload, type UploadGate } from '../pdf-upload'
+import { usePoll } from '../use-poll'
 
 export function DetailPage() {
   const params = useParams()
   const id = params.id
   const [selection, setSelection] = useState<number | null>(null)
-  const [detail, setDetail] = useState<DocumentDetail | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [nonce, setNonce] = useState(0)
-  const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const picker = useRef<HTMLInputElement>(null)
-
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [gate, setGate] = useState<UploadGate>({ uploading: false, open: false })
+  const locked = busy || gate.uploading
   const path = !id ? '' : selection == null ? `/api/documents/${id}` : `/api/documents/${id}/versions/${selection}`
-
-  useEffect(() => {
-    if (!path) return
-    let stop = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const tick = async () => {
-      try {
-        const next = await api<DocumentDetail>(path)
-        if (stop) return
-        setDetail(next)
-        setError(null)
-        if (next.version.status === 'queued' || next.version.status === 'extracting') {
-          timer = setTimeout(() => void tick(), 2000)
-        }
-      } catch (err) {
-        if (stop) return
-        setError(err instanceof Error ? err.message : 'Failed to load document')
-      }
-    }
-    void tick()
-    return () => {
-      stop = true
-      if (timer) clearTimeout(timer)
-    }
-  }, [path, nonce])
+  const { data: detail, error: loadError, refresh } = usePoll(
+    () => api<DocumentDetail>(path),
+    (next) => next.version.status === 'queued' || next.version.status === 'extracting',
+    [path],
+    path !== '',
+    'Failed to load document',
+  )
+  const pageError = actionError ?? loadError
 
   if (!id) return <Text>Missing document.</Text>
 
-  function openPicker() {
-    if (!id || busy || uploading || file) return
-    picker.current?.click()
-  }
-
-  function onPick(event: ChangeEvent<HTMLInputElement>) {
-    const next = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-    if (!next) return
-    if (!isPdfFile(next)) {
-      setError('Choose a PDF')
-      return
-    }
-    setError(null)
-    setUploadError(null)
-    setFile(next)
-  }
-
-  function closeUpload() {
-    if (uploading) return
-    setFile(null)
-    setUploadError(null)
-  }
-
-  async function uploadVersion() {
-    if (!id || !file || uploading || busy) return
-    setUploading(true)
-    setUploadError(null)
-    const body = new FormData()
-    body.set('file', file)
-    try {
-      const created = await api<CreatedDocument>(`/api/documents/${id}/versions`, { method: 'POST', body })
-      setFile(null)
-      setUploadError(null)
-      setSelection(created.versionNumber)
-      setNonce((value) => value + 1)
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }
-
   async function retry() {
-    if (!id) return
+    if (locked) return
     setBusy(true)
-    setError(null)
+    setActionError(null)
     try {
       const created = await api<CreatedDocument>(`/api/documents/${id}/retry`, { method: 'POST' })
       setSelection(created.versionNumber)
-      setNonce((value) => value + 1)
+      refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Retry failed')
+      setActionError(err instanceof Error ? err.message : 'Retry failed')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function uploadVersion(file: File) {
+    const body = new FormData()
+    body.set('file', file)
+    const created = await api<CreatedDocument>(`/api/documents/${id}/versions`, { method: 'POST', body })
+    setSelection(created.versionNumber)
+    refresh()
   }
 
   const values = [...(detail?.version.values ?? [])].sort((a, b) => attentionRank(a) - attentionRank(b))
@@ -126,7 +57,7 @@ export function DetailPage() {
       <Text component={Link} to="/" size="sm">
         Back to documents
       </Text>
-      {error ? <Alert color="red">{error}</Alert> : null}
+      {pageError ? <Alert color="red">{pageError}</Alert> : null}
       {!detail ? (
         <Text c="dimmed">Loading…</Text>
       ) : (
@@ -158,7 +89,7 @@ export function DetailPage() {
           </Group>
           {detail.version.error ? <Alert color="red">{detail.version.error}</Alert> : null}
           {detail.version.status === 'failed' && detail.version.number === detail.currentVersionNumber ? (
-            <Button onClick={() => void retry()} loading={busy} w="fit-content">
+            <Button onClick={() => void retry()} loading={busy} disabled={locked} w="fit-content">
               Retry extraction
             </Button>
           ) : null}
@@ -177,7 +108,7 @@ export function DetailPage() {
               </Table.Thead>
               <Table.Tbody>
                 {values.map((value) => (
-                  <FieldRow key={value.id} value={value} onChanged={() => setNonce((current) => current + 1)} />
+                  <FieldRow key={value.id} value={value} onChanged={() => refresh()} />
                 ))}
               </Table.Tbody>
             </Table>
@@ -191,44 +122,13 @@ export function DetailPage() {
               </Accordion.Panel>
             </Accordion.Item>
           </Accordion>
-          <Button onClick={openPicker} disabled={busy || uploading || file !== null} w="fit-content">
-            Upload version
-          </Button>
-          <input
-            ref={picker}
-            type="file"
-            accept="application/pdf,.pdf"
-            hidden
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={onPick}
+          <PdfUpload
+            busy={busy}
+            label="Upload version"
+            confirmLabel="Upload version"
+            onUpload={uploadVersion}
+            onGate={setGate}
           />
-          <Modal
-            opened={file !== null}
-            onClose={closeUpload}
-            title={file?.name}
-            size="sm"
-            closeOnClickOutside={!uploading}
-            closeOnEscape={!uploading}
-            withCloseButton={!uploading}
-          >
-            {file ? (
-              <Stack>
-                <Text size="sm" c="dimmed">
-                  {formatBytes(file.size)}
-                </Text>
-                {uploadError ? <Alert color="red">{uploadError}</Alert> : null}
-                <Group justify="flex-end">
-                  <Button variant="default" onClick={closeUpload} disabled={uploading}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => void uploadVersion()} loading={uploading}>
-                    Upload version
-                  </Button>
-                </Group>
-              </Stack>
-            ) : null}
-          </Modal>
         </>
       )}
     </Stack>
