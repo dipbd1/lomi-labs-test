@@ -1,10 +1,12 @@
 import type { ClearedDocuments, DocumentListItem, DocumentType } from '@lomi/contracts'
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
   FileInput,
   Group,
+  Menu,
   Paper,
   Select,
   Stack,
@@ -13,7 +15,7 @@ import {
   Title,
 } from '@mantine/core'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { statusColor, typeLabel } from '../format'
 
@@ -35,6 +37,7 @@ function isDocumentType(value: string | null): value is DocumentType {
 }
 
 export function ListPage() {
+  const navigate = useNavigate()
   const [documents, setDocuments] = useState<DocumentListItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -65,6 +68,21 @@ export function ListPage() {
       if (timer) clearTimeout(timer)
     }
   }, [nonce])
+
+  async function remove(document: DocumentListItem) {
+    if (busy) return
+    if (!window.confirm(`Delete ${document.title} and its stored PDFs?`)) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api<ClearedDocuments>(`/api/documents/${document.id}`, { method: 'DELETE' })
+      setNonce((value) => value + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function clearData() {
     if (busy) return
@@ -141,13 +159,26 @@ export function ListPage() {
               <Table.Th>Document</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Review</Table.Th>
+              <Table.Th />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {documents.map((document) => (
-              <Table.Tr key={document.id}>
+              <Table.Tr
+                key={document.id}
+                tabIndex={0}
+                aria-label={`Open ${document.title}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/documents/${document.id}`)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  navigate(`/documents/${document.id}`)
+                }}
+              >
                 <Table.Td>
-                  <AnchorTitle document={document} />
+                  <Text fw={600}>{document.title}</Text>
                   <Text size="sm" c="dimmed">
                     {typeLabel(document.type)} · v{document.currentVersionNumber}
                   </Text>
@@ -163,6 +194,20 @@ export function ListPage() {
                     {document.progress.approved} approved · {document.progress.corrected} corrected · {document.progress.carriedOver} carried over
                   </Text>
                 </Table.Td>
+                <Table.Td onClick={(event) => event.stopPropagation()}>
+                  <Menu position="bottom-end" withinPortal>
+                    <Menu.Target>
+                      <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${document.title}`}>
+                        ⋮
+                      </ActionIcon>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item color="red" onClick={() => void remove(document)}>
+                        Delete
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -170,13 +215,5 @@ export function ListPage() {
       </Table.ScrollContainer>
       {documents.length === 0 ? <Text c="dimmed">No documents yet.</Text> : null}
     </Stack>
-  )
-}
-
-function AnchorTitle({ document }: { document: DocumentListItem }) {
-  return (
-    <Text component={Link} to={`/documents/${document.id}`} fw={600}>
-      {document.title}
-    </Text>
   )
 }

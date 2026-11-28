@@ -142,11 +142,12 @@ Acceptance:
 
 ## FR-15 Review UI
 
-The list shows title, type, current version, status, and progress. Pending work is the loudest count on the row. The detail view has one row per field for the selected version, a version switcher that defaults to the current version, the value or the gap reason, the evidence quote, approve (hidden on gaps), and a correct form. The correct form has a cancel control that closes it and clears the draft without saving a review. When a correction exists, that value is shown in front and the extracted value stays visible. Carried-over rows are visually quiet. Changed rows show the previous value and review. Pending rows and gaps sort first. The visible document is polled every 2 seconds while it is `queued` or `extracting`.
+The list shows title, type, current version, status, and progress. Clicking a document row opens that document. The row menu does not. Pending work is the loudest count on the row. The detail view has one row per field for the selected version, a version switcher that defaults to the current version, the value or the gap reason, the evidence quote, approve (hidden on gaps), and a correct form. The correct form has a cancel control that closes it and clears the draft without saving a review. When a correction exists, that value is shown in front and the extracted value stays visible. Carried-over rows are visually quiet. Changed rows show the previous value and review. Pending rows and gaps sort first. The visible document is polled every 2 seconds while it is `queued` or `extracting`.
 
 Acceptance:
 
 - The list and detail screens render the states above.
+- Clicking a list row opens that document. The row menu stays on the list.
 - Approve is not offered for a gap.
 - A version other than the current one can be selected and shows that version's values.
 
@@ -165,3 +166,15 @@ Acceptance:
 - Stored PDF files for those versions are removed.
 - A second call returns a deleted count of zero.
 - The list screen has a control that calls this endpoint and shows the empty list.
+
+## FR-18 Delete one document
+
+`DELETE /documents/:id` removes that document, its versions, extracted values, reviews, and extraction runs, deletes the stored PDF files for those versions, and removes their extraction jobs. Other documents stay. A missing id is not found. Startup seeding is unchanged: the next process start creates fixture version 1 only when that document is absent.
+
+Acceptance:
+
+- After the call, `GET /documents` no longer includes that id, and the other documents remain.
+- A version of that document that was queued or extracting is not extracted after the call.
+- Stored PDF files for those versions are removed.
+- A missing id is rejected.
+- The list screen has a per-row menu with a delete action that calls this endpoint and drops that row.

@@ -43,6 +43,11 @@ export class ApiController {
     return this.documents.clear()
   }
 
+  @Delete('documents/:id')
+  remove(@Param('id') id: string) {
+    return this.documents.remove(id)
+  }
+
   @Post('documents')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }))
   create(

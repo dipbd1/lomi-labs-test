@@ -181,6 +181,30 @@ export class DocumentsService {
     }
   }
 
+  async remove(id: string): Promise<ClearedDocuments> {
+    await this.requireDocument(id)
+    const versions = await this.prisma.documentVersion.findMany({
+      where: { documentId: id },
+      select: { id: true, pdfPath: true },
+    })
+    const versionIds = versions.map((version) => version.id)
+    await this.removeJobs(versionIds)
+    await this.prisma.$transaction(async (tx) => {
+      await tx.review.deleteMany({ where: { value: { versionId: { in: versionIds } } } })
+      await tx.extractedValue.updateMany({
+        where: { versionId: { in: versionIds } },
+        data: { carriedFromId: null, previousValueId: null },
+      })
+      await tx.extractedValue.deleteMany({ where: { versionId: { in: versionIds } } })
+      await tx.extractionRun.deleteMany({ where: { versionId: { in: versionIds } } })
+      await tx.documentVersion.deleteMany({ where: { documentId: id } })
+      await tx.document.delete({ where: { id } })
+    })
+    await this.removePdfs(versions.map((version) => version.pdfPath))
+    await this.removeJobs(versionIds)
+    return { deleted: 1 }
+  }
+
   async retry(id: string): Promise<CreatedDocument> {
     const document = await this.requireDocument(id)
     const current = await this.latestVersion(id)
@@ -350,6 +374,12 @@ export class DocumentsService {
       await this.queue.enqueue(versionId)
     } catch (error) {
       this.logger.error(error instanceof Error ? error.message : `Enqueue failed for ${versionId}`)
+    }
+  }
+
+  private async removeJobs(versionIds: string[]) {
+    for (const versionId of versionIds) {
+      await this.queue.remove(versionId)
     }
   }
 }
