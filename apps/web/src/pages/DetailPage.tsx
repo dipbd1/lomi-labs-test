@@ -208,6 +208,13 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
     }
   }
 
+  function cancel() {
+    setOpen(false)
+    setCorrected('')
+    setNote('')
+    setError(null)
+  }
+
   async function correct() {
     if (!corrected.trim()) {
       setError('Enter a corrected value')
@@ -289,9 +296,14 @@ function FieldRow({ value, onChanged }: { value: ExtractedValueView; onChanged: 
                 onChange={(event) => setNote(event.currentTarget.value)}
                 minRows={2}
               />
-              <Button size="xs" onClick={() => void correct()} loading={busy}>
-                Save correction
-              </Button>
+              <Group gap="xs">
+                <Button size="xs" onClick={() => void correct()} loading={busy}>
+                  Save correction
+                </Button>
+                <Button size="xs" variant="default" onClick={cancel} disabled={busy}>
+                  Cancel
+                </Button>
+              </Group>
             </>
           ) : null}
           {error ? (

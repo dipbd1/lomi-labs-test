@@ -142,7 +142,7 @@ Acceptance:
 
 ## FR-15 Review UI
 
-The list shows title, type, current version, status, and progress. Pending work is the loudest count on the row. The detail view has one row per field for the selected version, a version switcher that defaults to the current version, the value or the gap reason, the evidence quote, approve (hidden on gaps), and a correct form. When a correction exists, that value is shown in front and the extracted value stays visible. Carried-over rows are visually quiet. Changed rows show the previous value and review. Pending rows and gaps sort first. The visible document is polled every 2 seconds while it is `queued` or `extracting`.
+The list shows title, type, current version, status, and progress. Pending work is the loudest count on the row. The detail view has one row per field for the selected version, a version switcher that defaults to the current version, the value or the gap reason, the evidence quote, approve (hidden on gaps), and a correct form. The correct form has a cancel control that closes it and clears the draft without saving a review. When a correction exists, that value is shown in front and the extracted value stays visible. Carried-over rows are visually quiet. Changed rows show the previous value and review. Pending rows and gaps sort first. The visible document is polled every 2 seconds while it is `queued` or `extracting`.
 
 Acceptance:
 
